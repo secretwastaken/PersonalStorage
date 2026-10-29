@@ -1,14 +1,15 @@
 import { Events } from 'discord.js';
 import * as store from './store.js';
+import { markMember, markUser } from './roles.js';
 import { deleteStorage, repairStorage } from './storage.js';
 
 // A storage waits this long for an owner who left, so somebody who left by
 // mistake, or was kicked and let back in, finds everything as it was.
 export const GRACE_MS = 7 * 86_400_000;
 
-// Leaving is noticed by asking Discord about each owner in turn rather than
-// by listening for it: hearing joins and leaves takes the privileged Server
-// Members intent, and every half hour is soon enough when the wait is a week.
+// Joins and leaves are heard as they happen, but not while the bot is down.
+// Asking Discord about each owner every half hour catches whatever was
+// missed, and is soon enough when the wait is a week.
 export const CHECK_MS = 30 * 60_000;
 
 // Discord's answers for somebody who is not in the server, and for an
@@ -31,6 +32,7 @@ async function memberOf(guild, userId) {
 export async function welcomeBack(guild, user) {
   store.setLeft(guild.id, user.id, null);
   await repairStorage(guild, user).catch((error) => console.error(`Could not repair the storage of ${user.id} on their return:`, error));
+  await markUser(guild, user.id);
 }
 
 /** Notes who has left, deletes the storages whose week is up, and welcomes back whoever returned. */
@@ -40,6 +42,7 @@ export async function check(guild, now = Date.now()) {
     if (member === null) continue;
     if (member) {
       if (row.left_at) await welcomeBack(guild, member.user);
+      else await markMember(member);
       continue;
     }
     if (!row.left_at) {

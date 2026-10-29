@@ -5,17 +5,43 @@ import { Collection } from 'discord.js';
 
 let nextId = 1000;
 
+// Members are kept per guild, so the roles one is given are still on them
+// the next time they are fetched.
+export function fakeMember(guild, id, bot = false) {
+  guild.people ??= new Map();
+  if (!guild.people.has(id)) {
+    const roles = new Collection();
+    guild.people.set(id, {
+      id,
+      guild,
+      user: { id, bot, username: id, displayName: id },
+      roles: { cache: roles, add: async (role) => void roles.set(role.id, role), remove: async (role) => void roles.delete(role.id) },
+    });
+  }
+  return guild.people.get(id);
+}
+
 export function fakeGuild({ filler = 0, permissions = true, failOn = null, present = null } = {}) {
   const cache = new Collection();
   let creates = 0;
   const guild = {
     id: `g${nextId++}`,
-    roles: { everyone: { id: 'everyone' } },
+    roles: {
+      everyone: { id: 'everyone' },
+      cache: new Collection(),
+      create: async ({ name }) => {
+        const role = { id: `r${nextId++}`, name, editable: true, toString: () => `@${name}` };
+        guild.roles.cache.set(role.id, role);
+        return role;
+      },
+    },
     members: {
       me: { id: 'bot', permissions: { has: () => permissions } },
-      fetch: async ({ user }) => {
+      fetch: async (asked) => {
+        if (asked === undefined) return new Collection(guild.people ?? []);
+        const user = typeof asked === 'string' ? asked : asked.user;
         if (present && !present.has(user)) throw Object.assign(new Error('Unknown Member'), { code: 10007 });
-        return { id: user, user: { id: user, username: user, displayName: user } };
+        return fakeMember(guild, user);
       },
     },
     channels: {

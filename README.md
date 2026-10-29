@@ -65,13 +65,23 @@ due. A reminder's text is read from its message when it rings. Deleting an
 entry's message by hand removes the entry, deleting a reminder cancels it,
 and `/storage delete` leaves nothing behind.
 
-A storage outlives its owner leaving the server by a week. The bot asks
-Discord every half hour whether each owner is still a member, which needs
-no privileged intent. Someone who comes back within the week finds
-everything as they left it, and the bot re-applies the privacy settings and
-their current name. After the week, the category and its channels are
-deleted along with their records. Coming back never builds a storage
-anyone did not ask for.
+A storage outlives its owner leaving the server by a week. The bot hears
+the leave as it happens, and asks Discord about each owner every half hour
+to catch anything that happened while it was down. Someone who comes back
+within the week finds everything as they left it, and the bot re-applies
+the privacy settings and their current name. After the week, the category
+and its channels are deleted along with their records. Coming back never
+builds a storage anyone did not ask for.
+
+## The No Personal Storage role
+
+Every member without a storage wears a role called **No Personal Storage**,
+given when they join or rejoin and taken off the moment they make one. Use
+it to point newcomers at the panel, for example with a channel only that
+role can see. `/storage delete` puts it back on. The bot uses a role of that
+name if the server has one, and makes it otherwise; it has to sit below the
+bot's own role. At every start the bot goes through the member list and puts
+the role right.
 
 Discord itself sets two limits on that promise, and `/setup` checks both
 for whoever runs it:
@@ -89,7 +99,8 @@ Node 22.13 or newer. There is nothing to compile: the database is the
 SQLite built into Node.
 
 1. Create an application at <https://discord.com/developers/applications>,
-   add a bot, and copy its token. No privileged intents are needed.
+   add a bot, and copy its token. Switch on the **Server Members** intent
+   under Bot: the role and the week a storage waits both need it.
 2. `cp .env.example .env` and fill in `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`
    and `TIMEZONE` (one zone, or several separated by commas).
 3. `npm install`

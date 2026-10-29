@@ -5,6 +5,7 @@ import { RELEASES } from './changelog.js';
 import { byName, confirmDelete, create, info, timezoneSet } from './commands.js';
 import { ROOT, config, configProblems } from './config.js';
 import { startDepartures, welcomeBack } from './departures.js';
+import { markEveryone, markMember } from './roles.js';
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
@@ -23,10 +24,12 @@ const { version } = JSON.parse(readFileSync(resolve(ROOT, 'package.json'), 'utf8
 if (RELEASES[0]?.version !== version) console.warn(`package.json says ${version} but the newest release in src/changelog.js is ${RELEASES[0]?.version}. Bump them together.`);
 
 // Guild Messages is only here for delete events. The bot never needs to read
-// what people type, so Message Content stays off.
+// what people type, so Message Content stays off. Guild Members is the
+// privileged one: joins and leaves, for the No Personal Storage role and the
+// week a storage waits for an owner who left.
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
-  partials: [Partials.Message, Partials.Channel],
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMembers],
+  partials: [Partials.Message, Partials.Channel, Partials.GuildMember],
 });
 
 client.once(Events.ClientReady, (ready) => {
@@ -34,6 +37,7 @@ client.once(Events.ClientReady, (ready) => {
   const invite = ready.generateInvite({ scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands], permissions: new PermissionsBitField(BOT_PERMISSIONS) });
   console.log(`Invite: ${invite}`);
   refreshPanels(ready);
+  for (const guild of ready.guilds.cache.values()) markEveryone(guild).catch((error) => console.error(`Could not bring the No Personal Storage role up to date in ${guild.name}:`, error.message));
 });
 
 // The panel is redrawn at startup, so a change to its wording reaches the
@@ -120,6 +124,24 @@ client.on(Events.MessageBulkDelete, (messages) => {
   for (const id of messages.keys()) store.forgetMessage(id);
 });
 client.on(Events.ChannelDelete, (channel) => store.forgetChannel(channel.id));
+
+// An arrival with no storage gets the role; an owner coming back gets their
+// storage, which ends the week it was waiting.
+client.on(Events.GuildMemberAdd, async (member) => {
+  if (member.user.bot) return;
+  try {
+    if (store.storage(member.guild.id, member.id)?.left_at) await welcomeBack(member.guild, member.user);
+    else await markMember(member);
+  } catch (error) {
+    console.error(`Could not handle ${member.id} joining:`, error);
+  }
+});
+
+// The half-hourly check would notice too; this starts the week on time.
+client.on(Events.GuildMemberRemove, (member) => {
+  const row = store.storage(member.guild.id, member.id);
+  if (row && !row.left_at) store.setLeft(member.guild.id, member.id, Date.now());
+});
 
 // A server that removes the bot keeps nothing of it.
 client.on(Events.GuildDelete, (guild) => {

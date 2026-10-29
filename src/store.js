@@ -65,6 +65,11 @@ db.exec(`
     timezone TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS roles (
+    guild_id           TEXT PRIMARY KEY,
+    no_storage_role_id TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS panels (
     guild_id   TEXT PRIMARY KEY,
     channel_id TEXT NOT NULL,
@@ -106,6 +111,8 @@ const s = {
   setTimezone: db.prepare('INSERT INTO people (user_id, timezone) VALUES (?, ?) ON CONFLICT (user_id) DO UPDATE SET timezone = excluded.timezone'),
   panel: db.prepare('SELECT * FROM panels WHERE guild_id = ?'),
   setPanel: db.prepare('INSERT INTO panels (guild_id, channel_id, message_id) VALUES (?, ?, ?) ON CONFLICT (guild_id) DO UPDATE SET channel_id = excluded.channel_id, message_id = excluded.message_id'),
+  noStorageRole: db.prepare('SELECT no_storage_role_id FROM roles WHERE guild_id = ?'),
+  setNoStorageRole: db.prepare('INSERT INTO roles (guild_id, no_storage_role_id) VALUES (?, ?) ON CONFLICT (guild_id) DO UPDATE SET no_storage_role_id = excluded.no_storage_role_id'),
   dropStorage: [
     db.prepare('DELETE FROM storages WHERE guild_id = ? AND user_id = ?'),
     db.prepare('DELETE FROM storage_channels WHERE guild_id = ? AND user_id = ?'),
@@ -179,3 +186,6 @@ export const setTimezone = (userId, zone) => s.setTimezone.run(userId, zone);
 
 export const panel = (guildId) => s.panel.get(guildId) ?? null;
 export const setPanel = (guildId, channelId, messageId) => s.setPanel.run(guildId, channelId, messageId);
+
+export const noStorageRole = (guildId) => s.noStorageRole.get(guildId)?.no_storage_role_id ?? null;
+export const setNoStorageRole = (guildId, roleId) => s.setNoStorageRole.run(guildId, roleId);

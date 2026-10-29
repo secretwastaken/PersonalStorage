@@ -2,6 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Interaction
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
+import { markMember, noStorageRole } from './roles.js';
 import * as store from './store.js';
 import { CHANNELS_PER_STORAGE, createStorage, deleteStorage, isEmpty, look, missingPermissions, repairStorage, roomLeft } from './storage.js';
 import { COLORS, setupPanel } from './text.js';
@@ -88,6 +89,7 @@ const remind = {
 export async function create(interaction) {
   await interaction.deferReply({ flags: EPHEMERAL });
   const result = await createStorage(interaction.guild, interaction.user);
+  if (result.created || result.reason === 'exists') await markMember(interaction.member);
   if (result.created) return say(interaction, `🗄️ Your storage is ready: ${result.home}. Only you can see it.`);
   if (result.reason === 'exists') {
     return say(interaction, result.home ? `You already have a storage: ${result.home}.` : 'You already have a storage, but its home channel is gone. `/storage repair` puts it back.');
@@ -167,6 +169,7 @@ export async function confirmDelete(interaction, answer) {
   if (answer !== 'yes') return interaction.update({ content: 'Kept. Nothing was deleted.', components: [] });
   await interaction.update({ content: 'Deleting your storage…', components: [] });
   await deleteStorage(interaction.guild, interaction.user.id);
+  await markMember(interaction.member);
   // The reply may have lived in a channel that no longer exists.
   await interaction.editReply({ content: '🗑️ Your storage is gone, with everything in it. You can make a new one any time.' }).catch(() => {});
 }
@@ -196,6 +199,8 @@ const setup = {
     // the ways that could stop being true, so whoever sets it up hears them.
     const admins = guild.roles.cache.filter((role) => !role.managed && role.permissions.has(PermissionFlagsBits.Administrator));
     if (admins.size) lines.push(`⚠️ ${[...admins.values()].join(', ')} ${admins.size === 1 ? 'has' : 'have'} Administrator, which sees every channel whatever its settings. The panel promises nobody else can look into a storage, so take Administrator off ${admins.size === 1 ? 'it' : 'them'}. Manage Server is enough to run /setup.`);
+    const role = await noStorageRole(guild);
+    lines.push(role ? `Members without a storage wear ${role}, and lose it when they make one.` : '⚠️ I couldn’t make or hand out the No Personal Storage role: the bot’s own role needs to sit above it. The log says which.');
     if (interaction.user.id === guild.ownerId) lines.push('⚠️ You own this server, and the owner can see every channel. The panel says the owner is an account nobody uses.');
     await say(interaction, lines.join('\n\n'));
   },

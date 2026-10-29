@@ -2,6 +2,15 @@
 // adding one; the bot warns at startup if the two disagree.
 export const RELEASES = [
   {
+    version: '1.3.0',
+    date: '2026-10-29',
+    changes: [
+      'Members without a personal storage wear the No Personal Storage role. It is given when they join or rejoin, and comes off the moment they make a storage.',
+      'Deleting your storage with /storage delete gives the role back.',
+      'Owners coming back within the week get their storage straight away, and never the role.',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-10-29',
     changes: [
