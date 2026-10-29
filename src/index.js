@@ -5,7 +5,7 @@ import { RELEASES } from './changelog.js';
 import { byName, confirmDelete, create, info, timezoneSet } from './commands.js';
 import { ROOT, config, configProblems } from './config.js';
 import { startDepartures, welcomeBack } from './departures.js';
-import { markEveryone, markMember } from './roles.js';
+import { giveJoinRoles, markEveryone, markMember } from './roles.js';
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
@@ -125,11 +125,13 @@ client.on(Events.MessageBulkDelete, (messages) => {
 });
 client.on(Events.ChannelDelete, (channel) => store.forgetChannel(channel.id));
 
-// An arrival with no storage gets the role; an owner coming back gets their
-// storage, which ends the week it was waiting.
+// Every arrival gets the JOIN_ROLES. One with no storage also gets the No
+// Personal Storage role; an owner coming back gets their storage, which ends
+// the week it was waiting.
 client.on(Events.GuildMemberAdd, async (member) => {
   if (member.user.bot) return;
   try {
+    await giveJoinRoles(member);
     if (store.storage(member.guild.id, member.id)?.left_at) await welcomeBack(member.guild, member.user);
     else await markMember(member);
   } catch (error) {

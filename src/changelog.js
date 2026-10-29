@@ -2,6 +2,14 @@
 // adding one; the bot warns at startup if the two disagree.
 export const RELEASES = [
   {
+    version: '1.4.0',
+    date: '2026-10-29',
+    changes: [
+      'Roles on join: everyone who joins gets the roles in JOIN_ROLES, Member here, alongside No Personal Storage if they have no storage.',
+      '/setup says which roles new members get, and warns about one the bot cannot give.',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-10-29',
     changes: [

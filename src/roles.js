@@ -1,3 +1,4 @@
+import { config } from './config.js';
 import * as store from './store.js';
 
 // Members without a storage wear this role, so the server can point them at
@@ -64,4 +65,32 @@ export async function markEveryone(guild) {
   if (!role) return;
   const members = await guild.members.fetch();
   for (const member of members.values()) await markMember(member, role);
+}
+
+/**
+ * The roles from JOIN_ROLES that the bot can hand out in this server. One it
+ * cannot find, or that sits above the bot's own, is named in the log.
+ */
+export function joinRoles(guild) {
+  const found = [];
+  for (const wanted of config.joinRoles) {
+    const role = guild.roles.cache.get(wanted) ?? guild.roles.cache.find((each) => each.name.toLowerCase() === wanted.toLowerCase());
+    if (!role) console.error(`JOIN_ROLES names "${wanted}", which is not a role in ${guild.name}.`);
+    else if (!role.editable) console.error(`The ${role.name} role in ${guild.name} sits above the bot's own, so the bot cannot give it on join.`);
+    else found.push(role);
+  }
+  return found;
+}
+
+/**
+ * Gives an arrival the JOIN_ROLES. One role at a time: given a list,
+ * discord.js writes the member's whole set of roles from its copy, and on a
+ * join that copy can miss a role Discord's onboarding gave a moment before.
+ */
+export async function giveJoinRoles(member) {
+  if (member.user.bot) return;
+  for (const role of joinRoles(member.guild)) {
+    if (member.roles.cache.has(role.id)) continue;
+    await member.roles.add(role, 'Joined the server').catch((error) => console.error(`Could not give the ${role.name} role to ${member.id}:`, error.message));
+  }
 }

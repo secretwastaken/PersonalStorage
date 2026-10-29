@@ -83,6 +83,14 @@ name if the server has one, and makes it otherwise; it has to sit below the
 bot's own role. At every start the bot goes through the member list and puts
 the role right.
 
+## Roles on join
+
+`JOIN_ROLES` in `.env` lists roles every member gets when they join, by name
+or id, separated by commas: `JOIN_ROLES=Member`. They are given on every
+join, rejoins included, and never taken away. `/setup` says which ones the
+bot can give; a name it cannot find, or a role above its own, is named in
+the log.
+
 Discord itself sets two limits on that promise, and `/setup` checks both
 for whoever runs it:
 
@@ -102,7 +110,8 @@ SQLite built into Node.
    add a bot, and copy its token. Switch on the **Server Members** intent
    under Bot: the role and the week a storage waits both need it.
 2. `cp .env.example .env` and fill in `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`
-   and `TIMEZONE` (one zone, or several separated by commas).
+   and `TIMEZONE` (one zone, or several separated by commas), and
+   `JOIN_ROLES` if members should get roles when they join.
 3. `npm install`
 4. `npm start` prints an invite link with exactly the permissions the bot
    needs. Invite it.

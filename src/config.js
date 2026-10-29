@@ -30,7 +30,8 @@ function validZone(zone) {
 const dbPath = trimmed(process.env.DB_PATH);
 
 /** "Europe/Lisbon, America/New_York" as a list, without blanks or repeats. */
-export const parseZones = (text) => [...new Set(String(text ?? '').split(',').map((zone) => zone.trim()).filter(Boolean))];
+export const parseList = (text) => [...new Set(String(text ?? '').split(',').map((item) => item.trim()).filter(Boolean))];
+export const parseZones = parseList;
 
 // The server's time zones. Members pick one of them as their clock, and every
 // reminder shows its time in each; the first is used until someone picks.
@@ -43,6 +44,8 @@ export const config = {
   devGuildId: trimmed(process.env.DISCORD_GUILD_ID) || null,
   timezones,
   timezone: timezones[0],
+  // Roles every member gets on joining, by name or id.
+  joinRoles: parseList(process.env.JOIN_ROLES),
   dbPath: dbPath === ':memory:' ? ':memory:' : resolve(ROOT, dbPath || 'data/personal-storage.db'),
 };
 

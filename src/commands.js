@@ -2,7 +2,7 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, Interaction
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
-import { markMember, noStorageRole } from './roles.js';
+import { joinRoles, markMember, noStorageRole } from './roles.js';
 import * as store from './store.js';
 import { CHANNELS_PER_STORAGE, createStorage, deleteStorage, isEmpty, look, missingPermissions, repairStorage, roomLeft } from './storage.js';
 import { COLORS, setupPanel } from './text.js';
@@ -201,6 +201,9 @@ const setup = {
     if (admins.size) lines.push(`⚠️ ${[...admins.values()].join(', ')} ${admins.size === 1 ? 'has' : 'have'} Administrator, which sees every channel whatever its settings. The panel promises nobody else can look into a storage, so take Administrator off ${admins.size === 1 ? 'it' : 'them'}. Manage Server is enough to run /setup.`);
     const role = await noStorageRole(guild);
     lines.push(role ? `Members without a storage wear ${role}, and lose it when they make one.` : '⚠️ I couldn’t make or hand out the No Personal Storage role: the bot’s own role needs to sit above it. The log says which.');
+    const onJoin = joinRoles(guild);
+    if (onJoin.length) lines.push(`Everyone who joins gets ${onJoin.join(', ')}.`);
+    if (onJoin.length < config.joinRoles.length) lines.push('⚠️ Some of the roles in JOIN_ROLES are missing or sit above the bot’s own role. The log says which.');
     if (interaction.user.id === guild.ownerId) lines.push('⚠️ You own this server, and the owner can see every channel. The panel says the owner is an account nobody uses.');
     await say(interaction, lines.join('\n\n'));
   },
