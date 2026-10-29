@@ -6,9 +6,12 @@ import { parseEnv } from 'node:util';
 export const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 // The .env beside package.json wins over whatever the shell exported, so a
-// stale variable from some other project can never sneak in.
+// stale variable from some other project can never sneak in. The one
+// exception is a process that asked for an in-memory database: that is the
+// tests, and they must never reach the real .env or the real database.
+const inMemory = (process.env.DB_PATH ?? '').trim() === ':memory:';
 try {
-  Object.assign(process.env, parseEnv(readFileSync(resolve(ROOT, '.env'), 'utf8')));
+  if (!inMemory) Object.assign(process.env, parseEnv(readFileSync(resolve(ROOT, '.env'), 'utf8')));
 } catch (error) {
   if (error.code !== 'ENOENT') throw error;
 }
