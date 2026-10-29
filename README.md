@@ -65,6 +65,14 @@ due. A reminder's text is read from its message when it rings. Deleting an
 entry's message by hand removes the entry, deleting a reminder cancels it,
 and `/storage delete` leaves nothing behind.
 
+A storage outlives its owner leaving the server by a week. The bot asks
+Discord every half hour whether each owner is still a member, which needs
+no privileged intent. Someone who comes back within the week finds
+everything as they left it, and the bot re-applies the privacy settings and
+their current name. After the week, the category and its channels are
+deleted along with their records. Coming back never builds a storage
+anyone did not ask for.
+
 Discord itself sets two limits on that promise, and `/setup` checks both
 for whoever runs it:
 

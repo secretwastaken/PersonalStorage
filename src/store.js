@@ -10,6 +10,7 @@ db.exec(`
     category_id     TEXT,
     home_message_id TEXT,
     created_at      TEXT NOT NULL,
+    left_at         TEXT,
     PRIMARY KEY (guild_id, user_id)
   );
 
@@ -71,12 +72,16 @@ db.exec(`
   );
 `);
 
+// Databases from before 1.2.0 were made without left_at.
+if (!db.prepare('PRAGMA table_info(storages)').all().some((column) => column.name === 'left_at')) db.exec('ALTER TABLE storages ADD COLUMN left_at TEXT');
+
 const s = {
   storage: db.prepare('SELECT * FROM storages WHERE guild_id = ? AND user_id = ?'),
   storages: db.prepare('SELECT * FROM storages WHERE guild_id = ? ORDER BY created_at'),
   insertStorage: db.prepare('INSERT INTO storages (guild_id, user_id, category_id, created_at) VALUES (?, ?, ?, ?)'),
   setCategory: db.prepare('UPDATE storages SET category_id = ? WHERE guild_id = ? AND user_id = ?'),
   setHome: db.prepare('UPDATE storages SET home_message_id = ? WHERE guild_id = ? AND user_id = ?'),
+  setLeft: db.prepare('UPDATE storages SET left_at = ? WHERE guild_id = ? AND user_id = ?'),
   channels: db.prepare('SELECT kind, channel_id FROM storage_channels WHERE guild_id = ? AND user_id = ?'),
   setChannel: db.prepare('INSERT INTO storage_channels (guild_id, user_id, kind, channel_id) VALUES (?, ?, ?, ?) ON CONFLICT (guild_id, user_id, kind) DO UPDATE SET channel_id = excluded.channel_id'),
   ownerOfChannel: db.prepare('SELECT guild_id, user_id, kind FROM storage_channels WHERE channel_id = ?'),
@@ -115,6 +120,7 @@ export const storages = (guildId) => s.storages.all(guildId);
 export const addStorage = (guildId, userId, categoryId) => s.insertStorage.run(guildId, userId, categoryId, now());
 export const setCategory = (guildId, userId, categoryId) => s.setCategory.run(categoryId, guildId, userId);
 export const setHome = (guildId, userId, messageId) => s.setHome.run(messageId, guildId, userId);
+export const setLeft = (guildId, userId, at) => s.setLeft.run(at ? new Date(at).toISOString() : null, guildId, userId);
 
 export function channels(guildId, userId) {
   return Object.fromEntries(s.channels.all(guildId, userId).map((row) => [row.kind, row.channel_id]));

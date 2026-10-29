@@ -4,12 +4,13 @@ import { resolve } from 'node:path';
 import { RELEASES } from './changelog.js';
 import { byName, confirmDelete, create, info, timezoneSet } from './commands.js';
 import { ROOT, config, configProblems } from './config.js';
+import { startDepartures, welcomeBack } from './departures.js';
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
 import { BOT_PERMISSIONS } from './storage.js';
 import * as store from './store.js';
-import { homePanel } from './text.js';
+import { homePanel, setupPanel } from './text.js';
 import { EPHEMERAL, storageFor } from './ui.js';
 
 const problems = configProblems();
@@ -32,7 +33,20 @@ client.once(Events.ClientReady, (ready) => {
   console.log(`${ready.user.tag} (Personal Storage ${version}) is online in ${ready.guilds.cache.size} server(s).`);
   const invite = ready.generateInvite({ scopes: [OAuth2Scopes.Bot, OAuth2Scopes.ApplicationsCommands], permissions: new PermissionsBitField(BOT_PERMISSIONS) });
   console.log(`Invite: ${invite}`);
+  refreshPanels(ready);
 });
+
+// The panel is redrawn at startup, so a change to its wording reaches the
+// copy already posted without anyone running /setup again.
+async function refreshPanels(client) {
+  for (const guild of client.guilds.cache.values()) {
+    const row = store.panel(guild.id);
+    if (!row) continue;
+    const channel = await guild.channels.fetch(row.channel_id).catch(() => null);
+    const message = await channel?.messages.fetch(row.message_id).catch(() => null);
+    await message?.edit(setupPanel()).catch((error) => console.error(`Could not refresh the panel in ${guild.name}:`, error.message));
+  }
+}
 
 async function onButton(interaction) {
   const [, action, ...rest] = interaction.customId.split(':');
@@ -74,6 +88,11 @@ async function onForm(interaction) {
 client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.inGuild()) return;
   try {
+    // Somebody back from leaving has their storage waiting. The half-hourly
+    // check would notice too, but not before they tried to use it. The repair
+    // is not waited for: Discord gives an interaction three seconds, and the
+    // channels kept their permissions while the owner was away anyway.
+    if (store.storage(interaction.guildId, interaction.user.id)?.left_at && interaction.guild) welcomeBack(interaction.guild, interaction.user);
     if (interaction.isButton() && interaction.customId.startsWith('ps:')) return await onButton(interaction);
     if (interaction.isStringSelectMenu() && interaction.customId === 'ps:zone') return await onZone(interaction);
     if (interaction.isModalSubmit() && interaction.customId.startsWith('ps:')) return await onForm(interaction);
@@ -109,6 +128,7 @@ client.on(Events.GuildDelete, (guild) => {
 });
 
 reminders.startClock(client);
+startDepartures(client);
 
 process.on('unhandledRejection', (error) => console.error('Unhandled rejection:', error));
 

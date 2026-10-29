@@ -2,6 +2,15 @@
 // adding one; the bot warns at startup if the two disagree.
 export const RELEASES = [
   {
+    version: '1.2.0',
+    date: '2026-10-29',
+    changes: [
+      'If you leave the server, your storage waits a week for you. Come back within it and everything is where you left it, under your current name.',
+      'A storage whose owner has been gone for a week is deleted, category and channels alike.',
+      'Nobody is given a storage they did not ask for: coming back only gives back one you already had.',
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-10-29',
     changes: [

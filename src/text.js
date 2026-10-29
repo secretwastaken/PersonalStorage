@@ -32,6 +32,7 @@ export const PRIVACY = [
   'Only you can see your storage. Nobody else in the server can open it, staff included.',
   'The server belongs to an account nobody uses, so not even the bot’s owner can look inside.',
   'The bot keeps no copy of what you write: it lives in your channels and nowhere else. Its database only records which channels are yours and when your reminders are due.',
+  'If you leave the server, your storage waits a week for you. Come back within it and everything is where you left it; after that it is deleted, for good.',
   '`/storage delete` removes the category and everything in it, for good.',
 ].join('\n\n');
 

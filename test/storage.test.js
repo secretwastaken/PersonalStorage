@@ -1,66 +1,12 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { ChannelType, Collection, PermissionFlagsBits as P } from 'discord.js';
+import { ChannelType, PermissionFlagsBits as P } from 'discord.js';
+import { fakeGuild } from './fakes.js';
 
 process.env.DB_PATH = ':memory:';
 const store = await import('../src/store.js');
 const { createStorage, deleteStorage, repairStorage, CHANNELS_PER_STORAGE } = await import('../src/storage.js');
 const { CHANNELS } = await import('../src/text.js');
-
-let nextId = 1000;
-
-function fakeGuild({ filler = 0, permissions = true, failOn = null } = {}) {
-  const cache = new Collection();
-  let creates = 0;
-  const guild = {
-    id: `g${nextId++}`,
-    roles: { everyone: { id: 'everyone' } },
-    members: { me: { id: 'bot', permissions: { has: () => permissions } } },
-    channels: {
-      cache,
-      fetch: async (id) => cache.get(id) ?? null,
-      create: async (options) => {
-        creates += 1;
-        if (failOn === creates) throw new Error('Discord said no');
-        const channel = fakeChannel(options, cache);
-        cache.set(channel.id, channel);
-        return channel;
-      },
-    },
-  };
-  for (let i = 0; i < filler; i++) cache.set(`filler${i}`, { id: `filler${i}` });
-  return guild;
-}
-
-function fakeChannel(options, cache) {
-  const id = String(nextId++);
-  const messages = new Collection();
-  const channel = {
-    id,
-    name: options.name,
-    type: options.type,
-    parentId: options.parent ?? null,
-    overwrites: options.permissionOverwrites,
-    permissionOverwrites: { set: async (overwrites) => void (channel.overwrites = overwrites) },
-    setName: async (name) => void (channel.name = name),
-    setParent: async (parent) => void (channel.parentId = parent),
-    delete: async () => void cache.delete(id),
-    send: async (payload) => {
-      const message = { id: String(nextId++), channelId: id, payload, edit: async (next) => void (message.payload = next) };
-      messages.set(message.id, message);
-      return message;
-    },
-    messages: {
-      cache: messages,
-      fetch: async (messageId) => {
-        if (!messages.has(messageId)) throw new Error('Unknown Message');
-        return messages.get(messageId);
-      },
-    },
-    toString: () => `<#${id}>`,
-  };
-  return channel;
-}
 
 const user = { id: 'u1', username: 'survivor', displayName: 'Survivor' };
 
