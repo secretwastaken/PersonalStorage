@@ -47,9 +47,9 @@ export async function markMember(member, role = null) {
   await (wants ? member.roles.add(role, reason) : member.roles.remove(role, reason)).catch((error) => console.error(`Could not ${wants ? 'give' : 'take'} the ${role.name} role ${wants ? 'to' : 'from'} ${member.id}:`, error.message));
 }
 
-/** The same, by id, for code that only has the user. */
+/** The same, by id, for code that only has the user. The member is read fresh from Discord. */
 export async function markUser(guild, userId) {
-  const member = await guild.members.fetch(userId).catch(() => null);
+  const member = await guild.members.fetch({ user: userId, force: true }).catch(() => null);
   if (member) await markMember(member);
 }
 

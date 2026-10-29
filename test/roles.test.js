@@ -84,3 +84,14 @@ test('a role above the bot is left alone', async () => {
   }
   assert.equal(member.roles.cache.size, 0);
 });
+
+test('a role knocked off by another bot is put back on the second look', async () => {
+  const { markUser } = await import('../src/roles.js');
+  const guild = fakeGuild();
+  const member = fakeMember(guild, 'u1');
+  await markMember(member);
+  const role = await noStorageRole(guild);
+  member.roles.cache.delete(role.id);
+  await markUser(guild, 'u1');
+  assert.ok(wears(member, role));
+});

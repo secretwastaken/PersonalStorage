@@ -2,6 +2,13 @@
 // adding one; the bot warns at startup if the two disagree.
 export const RELEASES = [
   {
+    version: '1.3.1',
+    date: '2026-10-29',
+    changes: [
+      'A newcomer keeps the No Personal Storage role even when another bot hands out its own roles at the same moment: the bot looks again ten seconds after a join and puts it back if it was knocked off.',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-10-29',
     changes: [

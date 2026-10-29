@@ -5,7 +5,7 @@ import { RELEASES } from './changelog.js';
 import { byName, confirmDelete, create, info, timezoneSet } from './commands.js';
 import { ROOT, config, configProblems } from './config.js';
 import { startDepartures, welcomeBack } from './departures.js';
-import { markEveryone, markMember } from './roles.js';
+import { markEveryone, markMember, markUser } from './roles.js';
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
@@ -125,6 +125,8 @@ client.on(Events.MessageBulkDelete, (messages) => {
 });
 client.on(Events.ChannelDelete, (channel) => store.forgetChannel(channel.id));
 
+const SETTLE_MS = 10_000;
+
 // An arrival with no storage gets the role; an owner coming back gets their
 // storage, which ends the week it was waiting.
 client.on(Events.GuildMemberAdd, async (member) => {
@@ -135,6 +137,10 @@ client.on(Events.GuildMemberAdd, async (member) => {
   } catch (error) {
     console.error(`Could not handle ${member.id} joining:`, error);
   }
+  // Other bots hand out roles on join too, and one that writes a member's
+  // whole list of roles from a copy a moment old takes this one off again.
+  // A second look once the joins have settled puts it back.
+  setTimeout(() => markUser(member.guild, member.id).catch((error) => console.error(`Could not check the role of ${member.id} after joining:`, error)), SETTLE_MS).unref?.();
 });
 
 // The half-hourly check would notice too; this starts the week on time.
