@@ -3,7 +3,7 @@ import { config } from './config.js';
 import * as store from './store.js';
 import { COLORS } from './text.js';
 import { EPHEMERAL, answers, excerpt, form, say, storageFor, warmCache } from './ui.js';
-import { describeEvery, nextAfter, parseDuration, parseWhen, timestamp } from './when.js';
+import { describeEvery, nextAfter, parseDuration, parseWhen, timestamp, validTimezone, wallClock, zoneLabel } from './when.js';
 
 // A reminder is a message in the person's reminders channel. Its text is read
 // from that message when it fires, so the database holds only the time.
@@ -17,13 +17,17 @@ export const MAX_TEXT = 1500;
 
 export const zoneOf = (userId) => store.timezone(userId) ?? config.timezone;
 
+// Players are spread over the server's zones, so a reminder spells its time
+// out on each of their clocks as well as in Discord's own (the reader's).
+export const clocks = (date) => config.timezones.map((zone) => `${zoneLabel(zone)}: ${wallClock(date, zone)}`).join(' · ');
+
 const embedOf = (message) => message?.embeds?.[0]?.data ?? message?.embeds?.[0] ?? {};
 export const textOf = (message) => embedOf(message).description ?? '';
 
 export function reminderEmbed(row, text, sentAt = null) {
   const embed = new EmbedBuilder().setTitle(`⏰ Reminder #${row.number}`).setDescription(text);
   if (row.status === 'pending') {
-    embed.setColor(COLORS.reminder).addFields({ name: 'When', value: `${timestamp(row.due_at, 'F')} (${timestamp(row.due_at, 'R')})` });
+    embed.setColor(COLORS.reminder).addFields({ name: 'When', value: `${timestamp(row.due_at, 'F')} (${timestamp(row.due_at, 'R')})\n${clocks(row.due_at)}` });
     if (row.every_ms) embed.addFields({ name: 'Repeats', value: describeEvery(row.every_ms), inline: true });
     if (row.dm) embed.addFields({ name: 'Also by DM', value: 'Yes', inline: true });
     embed.setFooter({ text: row.every_ms ? `/remind cancel ${row.number} stops it` : `/remind cancel ${row.number} cancels it` });
@@ -60,13 +64,14 @@ export function plan({ when, repeat }, zone, now = new Date()) {
 
 const clockTime = (when) => !parseDuration(String(when ?? '').trim().toLowerCase().replace(/^in\s+/, ''));
 
-async function create(interaction, { what, when, repeat, dm }) {
+async function create(interaction, { what, when, repeat, dm, zone: chosen = null }) {
   const found = await storageFor(interaction, 'reminders');
   if (!found) return;
   const text = String(what ?? '').trim().slice(0, MAX_TEXT);
   if (!text) return say(interaction, 'The reminder needs some words.');
   if (store.pendingReminders(interaction.guildId, interaction.user.id).length >= MAX_PENDING) return say(interaction, `You have ${MAX_PENDING} reminders waiting already. \`/remind cancel\` makes room.`);
-  const zone = zoneOf(interaction.user.id);
+  if (chosen && !validTimezone(chosen)) return say(interaction, `“${chosen}” isn’t a time zone I know.`);
+  const zone = chosen || zoneOf(interaction.user.id);
   const planned = plan({ when, repeat }, zone);
   if (planned.error) return say(interaction, planned.error);
 
@@ -76,8 +81,8 @@ async function create(interaction, { what, when, repeat, dm }) {
   const message = await channel.send({ embeds: [reminderEmbed(draft, text)] });
   store.addReminder({ guildId: interaction.guildId, userId: interaction.user.id, number, channelId: channel.id, messageId: message.id, dueAt: planned.dueAt, everyMs: planned.everyMs, dm });
 
-  const lines = [`⏰ Reminder #${number} set for ${timestamp(planned.dueAt, 'F')} (${timestamp(planned.dueAt, 'R')}).${planned.everyMs ? ` It repeats ${describeEvery(planned.everyMs)}.` : ''} ${message.url}`];
-  if (clockTime(when) && !store.timezone(interaction.user.id)) lines.push(`-# Read as ${zone} time. \`/storage timezone\` sets yours.`);
+  const lines = [`⏰ Reminder #${number} set for ${timestamp(planned.dueAt, 'F')} (${timestamp(planned.dueAt, 'R')}).${planned.everyMs ? ` It repeats ${describeEvery(planned.everyMs)}.` : ''} ${message.url}`, clocks(planned.dueAt)];
+  if (clockTime(when) && !chosen && !store.timezone(interaction.user.id)) lines.push(`-# “${excerpt(when, 40)}” was read as ${zoneLabel(zone)} time. Pick your clock on your home panel or with \`/storage timezone\`, or set \`zone\` on the reminder.`);
   await say(interaction, lines.join('\n'));
 }
 
@@ -88,35 +93,43 @@ export async function remindMe(interaction) {
     when: interaction.options.getString('when', true),
     repeat: interaction.options.getString('repeat'),
     dm: interaction.options.getBoolean('dm') ?? false,
+    zone: interaction.options.getString('zone'),
   });
 }
 
-export const FORM_FIELDS = [
-  { id: 'what', label: 'Remind me to…', type: 'paragraph', max: MAX_TEXT, required: true, placeholder: 'Refuel the generator' },
-  { id: 'when', label: 'When', type: 'text', max: 40, required: true, placeholder: '2h, 30m, 18:30, tomorrow 9:00, 24/12 20:00' },
-  { id: 'repeat', label: 'Repeat every (leave empty for once)', type: 'text', max: 20, placeholder: '1d, 12h, 1w' },
-  {
-    id: 'dm',
-    label: 'Where should it ring?',
-    type: 'select',
-    build: () =>
-      new StringSelectMenuBuilder()
-        .setCustomId('dm')
-        .setMinValues(1)
-        .setMaxValues(1)
-        .addOptions(
-          new StringSelectMenuOptionBuilder().setLabel('In my reminders channel').setValue('no').setDefault(true),
-          new StringSelectMenuOptionBuilder().setLabel('In my reminders channel and by DM').setValue('yes'),
-        ),
-  },
-];
+const option = (label, value, chosen) => new StringSelectMenuOptionBuilder().setLabel(label).setValue(value).setDefault(value === chosen);
 
-export const reminderForm = () => form('ps:new:reminder', 'New reminder', FORM_FIELDS);
+/** The reminder form's fields. With more than one server zone it asks which clock the time is on, starting from the person's own. */
+export function formFields(zone = config.timezone) {
+  const fields = [
+    { id: 'what', label: 'Remind me to…', type: 'paragraph', max: MAX_TEXT, required: true, placeholder: 'Refuel the generator' },
+    { id: 'when', label: 'When', type: 'text', max: 40, required: true, placeholder: '2h, 30m, 18:30, tomorrow 9:00, 24/12 20:00' },
+    { id: 'repeat', label: 'Repeat every (leave empty for once)', type: 'text', max: 20, placeholder: '1d, 12h, 1w' },
+    {
+      id: 'dm',
+      label: 'Where should it ring?',
+      type: 'select',
+      build: () => new StringSelectMenuBuilder().setCustomId('dm').setMinValues(1).setMaxValues(1).addOptions(option('In my reminders channel', 'no', 'no'), option('In my reminders channel and by DM', 'yes', 'no')),
+    },
+  ];
+  if (config.timezones.length > 1) {
+    const own = config.timezones.includes(zone) ? zone : config.timezone;
+    fields.push({
+      id: 'zone',
+      label: 'A clock time like 18:30 is in…',
+      type: 'select',
+      build: () => new StringSelectMenuBuilder().setCustomId('zone').setMinValues(1).setMaxValues(1).addOptions(config.timezones.map((each) => option(`${zoneLabel(each)} time`, each, own))),
+    });
+  }
+  return fields;
+}
+
+export const reminderForm = (zone) => form('ps:new:reminder', 'New reminder', formFields(zone));
 
 export async function submitForm(interaction) {
   await interaction.deferReply({ flags: EPHEMERAL });
-  const values = answers(interaction, FORM_FIELDS);
-  await create(interaction, { ...values, dm: values.dm === 'yes' });
+  const values = answers(interaction, formFields(zoneOf(interaction.user.id)));
+  await create(interaction, { ...values, dm: values.dm === 'yes', zone: values.zone ?? null });
 }
 
 async function pendingWithText(guild, userId) {

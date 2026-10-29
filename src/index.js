@@ -2,13 +2,14 @@ import { Client, Events, GatewayIntentBits, OAuth2Scopes, Partials, PermissionsB
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { RELEASES } from './changelog.js';
-import { byName, confirmDelete, create, info } from './commands.js';
+import { byName, confirmDelete, create, info, timezoneSet } from './commands.js';
 import { ROOT, config, configProblems } from './config.js';
 import * as entries from './entries.js';
 import { KINDS } from './kinds.js';
 import * as reminders from './reminders.js';
 import { BOT_PERMISSIONS } from './storage.js';
 import * as store from './store.js';
+import { homePanel } from './text.js';
 import { EPHEMERAL, storageFor } from './ui.js';
 
 const problems = configProblems();
@@ -43,12 +44,22 @@ async function onButton(interaction) {
   if (action === 'stop') return reminders.stop(interaction, rest[0]);
   if (action === 'open') {
     if (rest[0] === 'reminder') {
-      if (await storageFor(interaction, 'reminders')) await interaction.showModal(reminders.reminderForm());
+      if (await storageFor(interaction, 'reminders')) await interaction.showModal(reminders.reminderForm(reminders.zoneOf(interaction.user.id)));
       return;
     }
     const kind = KINDS[rest[0]];
     if (kind && (await storageFor(interaction, kind.channel))) await interaction.showModal(entries.newForm(kind));
   }
+}
+
+// The clock menu on a home panel: only its owner can see it, so the panel
+// is redrawn with their choice showing.
+async function onZone(interaction) {
+  const zone = interaction.values[0];
+  if (!config.timezones.includes(zone)) return interaction.reply({ content: 'That zone isn’t one this server uses.', flags: EPHEMERAL });
+  store.setTimezone(interaction.user.id, zone);
+  await interaction.update(homePanel(interaction.user, store.channels(interaction.guildId, interaction.user.id), zone));
+  await interaction.followUp({ content: timezoneSet(zone), flags: EPHEMERAL });
 }
 
 async function onForm(interaction) {
@@ -64,6 +75,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.inGuild()) return;
   try {
     if (interaction.isButton() && interaction.customId.startsWith('ps:')) return await onButton(interaction);
+    if (interaction.isStringSelectMenu() && interaction.customId === 'ps:zone') return await onZone(interaction);
     if (interaction.isModalSubmit() && interaction.customId.startsWith('ps:')) return await onForm(interaction);
     const command = interaction.commandName ? byName.get(interaction.commandName) : null;
     if (!command) return;

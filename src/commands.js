@@ -6,7 +6,10 @@ import * as store from './store.js';
 import { CHANNELS_PER_STORAGE, createStorage, deleteStorage, isEmpty, look, missingPermissions, repairStorage, roomLeft } from './storage.js';
 import { COLORS, setupPanel } from './text.js';
 import { EPHEMERAL, noStorageText, say } from './ui.js';
-import { validTimezone } from './when.js';
+import { config } from './config.js';
+import { validTimezone, wallClock, zoneLabel } from './when.js';
+
+export const timezoneSet = (zone) => `🕒 Your reminders now use ${zoneLabel(zone)} time (${zone}), where it is ${wallClock(new Date(), zone)}.`;
 
 const guildOnly = (builder) => builder.setContexts(InteractionContextType.Guild);
 
@@ -58,7 +61,13 @@ const remind = {
         .addStringOption((o) => o.setName('when').setDescription('2h, 30m, 18:30, tomorrow 9:00, 24/12 20:00').setRequired(true).setMaxLength(40))
         .addStringOption((o) => o.setName('what').setDescription('What to remind you of').setRequired(true).setMaxLength(reminders.MAX_TEXT))
         .addStringOption((o) => o.setName('repeat').setDescription('Repeat every… (1d, 12h, 1w). Leave out for once.').setMaxLength(20))
-        .addBooleanOption((o) => o.setName('dm').setDescription('Also send it to you by DM')),
+        .addBooleanOption((o) => o.setName('dm').setDescription('Also send it to you by DM'))
+        .addStringOption((o) => {
+          o.setName('zone').setDescription('Which clock a time like 18:30 is on (yours if left out)');
+          // Discord shows at most 25 fixed choices; beyond that the zone is typed.
+          if (config.timezones.length <= 25) o.addChoices(...config.timezones.map((zone) => ({ name: `${zoneLabel(zone)} time`, value: zone })));
+          return o.setMaxLength(64);
+        }),
     )
     .addSubcommand((sub) => sub.setName('list').setDescription('Show the reminders waiting'))
     .addSubcommand((sub) =>
@@ -128,8 +137,7 @@ const storageCommand = {
       const zone = interaction.options.getString('zone', true).trim();
       if (!validTimezone(zone)) return say(interaction, `“${zone}” isn’t a time zone I know. Pick one from the list as you type, like Europe/Lisbon.`);
       store.setTimezone(interaction.user.id, zone);
-      const clock = new Intl.DateTimeFormat('en-GB', { timeZone: zone, hour: '2-digit', minute: '2-digit', weekday: 'long' }).format(new Date());
-      return say(interaction, `🕒 Your reminders now use ${zone}, where it is ${clock}.`);
+      return say(interaction, timezoneSet(zone));
     }
     if (sub === 'repair') {
       await interaction.deferReply({ flags: EPHEMERAL });
@@ -149,8 +157,9 @@ const storageCommand = {
   },
   async autocomplete(interaction) {
     const typed = String(interaction.options.getFocused() ?? '').toLowerCase().replace(/\s+/g, '_');
-    const zones = Intl.supportedValuesOf('timeZone');
-    await interaction.respond(zones.filter((zone) => zone.toLowerCase().includes(typed)).slice(0, 25).map((zone) => ({ name: zone, value: zone })));
+    // The server's own zones come first, so most people pick from two lines.
+    const zones = [...new Set([...config.timezones, ...Intl.supportedValuesOf('timeZone')])];
+    await interaction.respond(zones.filter((zone) => zone.toLowerCase().includes(typed)).slice(0, 25).map((zone) => ({ name: config.timezones.includes(zone) ? `${zone} (${zoneLabel(zone)}, used on this server)` : zone, value: zone })));
   },
 };
 

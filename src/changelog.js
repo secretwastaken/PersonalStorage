@@ -2,6 +2,15 @@
 // adding one; the bot warns at startup if the two disagree.
 export const RELEASES = [
   {
+    version: '1.1.0',
+    date: '2026-10-29',
+    changes: [
+      'The server can run on more than one clock: TIMEZONE takes a list, Europe/Lisbon,America/New_York here.',
+      'Every reminder shows its time in Lisbon and in New York, as well as in your own Discord time.',
+      'Your home panel has a menu for picking your clock, and /remind me and the reminder form can set the clock for one reminder.',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-10-29',
     changes: [

@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 process.env.DB_PATH = ':memory:';
+process.env.TIMEZONE = 'Europe/Lisbon, America/New_York';
 const { applyAmount, parseWhen } = await import('../src/when.js');
-const { parseRepeat, plan, reminderEmbed, textOf } = await import('../src/reminders.js');
+const { clocks, formFields, parseRepeat, plan, reminderEmbed, textOf } = await import('../src/reminders.js');
+const { config, parseZones } = await import('../src/config.js');
+const { homePanel } = await import('../src/text.js');
+const { form } = await import('../src/ui.js');
 const store = await import('../src/store.js');
 const { COMMANDS } = await import('../src/commands.js');
 
@@ -68,4 +72,38 @@ test('every command fits Discord’s limits', () => {
     assert.ok(json.description.length <= 100);
     walk(json.options);
   }
+});
+
+test('the server can have more than one time zone', () => {
+  assert.deepEqual(parseZones(' Europe/Lisbon, America/New_York,Europe/Lisbon ,'), ['Europe/Lisbon', 'America/New_York']);
+  assert.deepEqual(config.timezones, ['Europe/Lisbon', 'America/New_York']);
+  assert.equal(config.timezone, 'Europe/Lisbon', 'the first is the default');
+});
+
+test('a reminder shows its time on every clock the server uses', () => {
+  assert.equal(clocks(now), 'Lisbon: Thu 29 Oct, 15:00 · New York: Thu 29 Oct, 11:00');
+  const when = reminderEmbed({ number: 1, due_at: now.toISOString(), status: 'pending' }, 'Loot the mall').toJSON().fields[0].value;
+  assert.match(when, /\nLisbon: Thu 29 Oct, 15:00 · New York: Thu 29 Oct, 11:00$/);
+});
+
+test('the reminder form asks which clock, starting from the person’s own', () => {
+  const zone = formFields('America/New_York').find((field) => field.id === 'zone');
+  const menu = zone.build().toJSON();
+  assert.deepEqual(menu.options.map((o) => [o.value, Boolean(o.default)]), [['Europe/Lisbon', false], ['America/New_York', true]]);
+  assert.equal(form('ps:new:reminder', 'New reminder', formFields()).toJSON().components.length, 5, 'a form holds five questions at most');
+});
+
+test('the home panel carries the clock menu, showing the choice made', () => {
+  const rows = homePanel({ displayName: 'Survivor' }, {}, 'America/New_York').components.map((row) => row.toJSON());
+  const menu = rows.at(-1).components[0];
+  assert.equal(menu.custom_id, 'ps:zone');
+  assert.deepEqual(menu.options.filter((o) => o.default).map((o) => o.value), ['America/New_York']);
+});
+
+test('/remind me offers the server’s zones', () => {
+  const me = COMMANDS.find((command) => command.data.name === 'remind').data.toJSON().options.find((o) => o.name === 'me');
+  assert.deepEqual(me.options.find((o) => o.name === 'zone').choices.map(({ name, value }) => ({ name, value })), [
+    { name: 'Lisbon time', value: 'Europe/Lisbon' },
+    { name: 'New York time', value: 'America/New_York' },
+  ]);
 });

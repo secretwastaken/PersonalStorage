@@ -29,11 +29,20 @@ function validZone(zone) {
 
 const dbPath = trimmed(process.env.DB_PATH);
 
+/** "Europe/Lisbon, America/New_York" as a list, without blanks or repeats. */
+export const parseZones = (text) => [...new Set(String(text ?? '').split(',').map((zone) => zone.trim()).filter(Boolean))];
+
+// The server's time zones. Members pick one of them as their clock, and every
+// reminder shows its time in each; the first is used until someone picks.
+const timezones = parseZones(process.env.TIMEZONE);
+if (!timezones.length) timezones.push('UTC');
+
 export const config = {
   token: trimmed(process.env.DISCORD_TOKEN),
   clientId: trimmed(process.env.DISCORD_CLIENT_ID),
   devGuildId: trimmed(process.env.DISCORD_GUILD_ID) || null,
-  timezone: trimmed(process.env.TIMEZONE) || 'UTC',
+  timezones,
+  timezone: timezones[0],
   dbPath: dbPath === ':memory:' ? ':memory:' : resolve(ROOT, dbPath || 'data/personal-storage.db'),
 };
 
@@ -42,6 +51,8 @@ export function configProblems() {
   if (!config.token) problems.push('DISCORD_TOKEN is empty. Copy the bot token from the Developer Portal into .env.');
   if (!/^\d{17,20}$/.test(config.clientId)) problems.push('DISCORD_CLIENT_ID is not an application id (a number of 17 to 20 digits).');
   if (config.devGuildId && !/^\d{17,20}$/.test(config.devGuildId)) problems.push('DISCORD_GUILD_ID is not a server id.');
-  if (!validZone(config.timezone)) problems.push(`TIMEZONE "${config.timezone}" is not a time zone. Use a name like Europe/Lisbon or America/New_York.`);
+  for (const zone of config.timezones) {
+    if (!validZone(zone)) problems.push(`TIMEZONE has "${zone}", which is not a time zone. Use names like Europe/Lisbon,America/New_York.`);
+  }
   return problems;
 }

@@ -88,7 +88,7 @@ export async function createStorage(guild, user) {
         store.setChannel(guild.id, user.id, spec.kind, channel.id);
       }
       const home = made.find((channel) => channel.id === ids.home);
-      const panel = await home.send(homePanel(user, ids));
+      const panel = await home.send(homePanel(user, ids, store.timezone(user.id)));
       store.setHome(guild.id, user.id, panel.id);
       return { created: true, home };
     } catch (error) {
@@ -147,9 +147,9 @@ export async function repairStorage(guild, user) {
   const home = await channelIn(guild, ids.home);
   const panel = found.row.home_message_id ? await home.messages.fetch(found.row.home_message_id).catch(() => null) : null;
   if (panel) {
-    await panel.edit(homePanel(user, ids));
+    await panel.edit(homePanel(user, ids, store.timezone(user.id)));
   } else {
-    const posted = await home.send(homePanel(user, ids));
+    const posted = await home.send(homePanel(user, ids, store.timezone(user.id)));
     store.setHome(guild.id, user.id, posted.id);
     fixed.push('posted the home panel again');
   }

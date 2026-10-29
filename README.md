@@ -33,7 +33,7 @@ from any channel in the server.
 | `/storage timezone` | The time zone your reminders are read in |
 | `/storage repair` | Brings back deleted channels, re-applies the privacy settings, and renames the category if your name changed |
 | `/storage delete` | Deletes the whole storage, after asking |
-| `/remind me` `when` `what` `[repeat]` `[dm]` | A reminder: `2h`, `30m`, `18:30`, `tomorrow 9:00`, `24/12 20:00`. Repeats take `1d`, `12h`, `1w` |
+| `/remind me` `when` `what` `[repeat]` `[dm]` `[zone]` | A reminder: `2h`, `30m`, `18:30`, `tomorrow 9:00`, `24/12 20:00`. Repeats take `1d`, `12h`, `1w`. `zone` says which clock a time like 18:30 is on, for this reminder only |
 | `/remind list`, `/remind cancel` | The reminders waiting, and cancelling one |
 | `/note add\|edit\|remove\|list` | Notes. `add` without text opens a form with room for several lines |
 | `/item add\|edit\|remove\|list` | Inventory. `/item amount` sets a quantity (`12`) or changes it (`+3`, `-2`) |
@@ -43,6 +43,11 @@ from any channel in the server.
 
 `edit` opens a form filled in with the entry as it is. The entry to edit or
 remove is picked by number, and the list suggests them as you type.
+
+`TIMEZONE` can list several zones, like `Europe/Lisbon,America/New_York`
+for players on both sides of the Atlantic. Every reminder then shows its
+time on each of those clocks, and each member picks theirs from a menu on
+their home panel. Until they do, times are read on the first one.
 
 A reminder rings in the reminders channel with a mention, and by DM too if
 asked. One-off reminders can be snoozed from the ping; repeating ones can be
@@ -78,7 +83,7 @@ SQLite built into Node.
 1. Create an application at <https://discord.com/developers/applications>,
    add a bot, and copy its token. No privileged intents are needed.
 2. `cp .env.example .env` and fill in `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`
-   and `TIMEZONE`.
+   and `TIMEZONE` (one zone, or several separated by commas).
 3. `npm install`
 4. `npm start` prints an invite link with exactly the permissions the bot
    needs. Invite it.

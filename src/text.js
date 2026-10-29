@@ -1,4 +1,6 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, StringSelectMenuBuilder, StringSelectMenuOptionBuilder } from 'discord.js';
+import { config } from './config.js';
+import { zoneLabel } from './when.js';
 
 // Every word members read in the panels lives here, so the wording can change
 // without touching how anything works.
@@ -53,7 +55,7 @@ export function setupPanel() {
   return { embeds: [embed], components: [row] };
 }
 
-export function homePanel(user, channelIds) {
+export function homePanel(user, channelIds, zone = null) {
   const link = (kind) => (channelIds[kind] ? `<#${channelIds[kind]}>` : `#${kind}`);
   const embed = new EmbedBuilder()
     .setColor(COLORS.panel)
@@ -66,7 +68,7 @@ export function homePanel(user, channelIds) {
       { name: '📍 Coordinates', value: `${link('coordinates')}\nX, Y and floor from the map. \`/place add\``, inline: true },
       { name: '📸 Screenshots', value: `${link('screenshots')}\nDrop pictures in, or \`/screenshot add\`.`, inline: true },
       { name: '📖 Journal', value: `${link('journal')}\nYour run, day by day. \`/journal add\``, inline: true },
-      { name: 'Useful to know', value: 'Every entry the bot posts gets a number, used by `edit` and `remove`. Deleting an entry’s message by hand removes it too, and deleting a reminder cancels it. `/storage repair` brings back a channel you deleted, and `/storage timezone` sets the clock your reminders use.' },
+      { name: 'Useful to know', value: 'Every entry the bot posts gets a number, used by `edit` and `remove`. Deleting an entry’s message by hand removes it too, and deleting a reminder cancels it. `/storage repair` brings back a channel you deleted. Reminders show their time on every clock the server uses; the menu below or `/storage timezone` sets yours, which is how a time like 18:30 is read.' },
     );
   const rows = [
     new ActionRowBuilder().addComponents(
@@ -81,5 +83,15 @@ export function homePanel(user, channelIds) {
       new ButtonBuilder().setCustomId('ps:info').setStyle(ButtonStyle.Secondary).setEmoji('📊').setLabel('What’s stored'),
     ),
   ];
+  // With players in more than one zone, the clock is one click away. The
+  // menu shows the person's choice, and the server's first zone until then.
+  if (config.timezones.length > 1) {
+    const own = config.timezones.includes(zone) ? zone : null;
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId('ps:zone')
+      .setPlaceholder(`Your clock: ${zoneLabel(config.timezone)} time until you pick`)
+      .addOptions(config.timezones.slice(0, 25).map((each) => new StringSelectMenuOptionBuilder().setLabel(`My clock is ${zoneLabel(each)} time`).setDescription(each).setValue(each).setDefault(each === own)));
+    rows.push(new ActionRowBuilder().addComponents(menu));
+  }
   return { embeds: [embed], components: rows };
 }

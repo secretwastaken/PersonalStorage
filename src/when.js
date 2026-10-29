@@ -177,3 +177,11 @@ export function applyAmount(current, change) {
   if (match[1] === '-') return Math.max(0, current - amount);
   return amount;
 }
+
+/** "New York" for America/New_York. */
+export const zoneLabel = (zone) => String(zone).split('/').pop().replace(/_/g, ' ');
+
+/** "Thu 29 Oct, 18:30" as the clock on the wall in a zone. */
+export function wallClock(date, zone) {
+  return new Intl.DateTimeFormat('en-GB', { timeZone: zone, weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(date));
+}
