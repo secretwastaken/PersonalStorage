@@ -1,0 +1,24 @@
+# Keeps the bot running, and starts it again after a crash or a reboot.
+#
+#   cp deploy/personalstorage.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now personalstorage
+#
+#   journalctl -u personalstorage -f     # live logs
+
+[Unit]
+Description=Personal Storage Discord bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/root/personalstorage
+ExecStart=/usr/bin/node --no-warnings src/index.js
+Restart=always
+RestartSec=5
+# The token is in .env; nothing the bot writes should be readable by others.
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

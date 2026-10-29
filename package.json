@@ -1,0 +1,19 @@
+{
+  "name": "personal-storage",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "A Discord bot that gives every member a private category for reminders, notes, inventory, coordinates, screenshots and a journal.",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --no-warnings src/index.js",
+    "register": "node --no-warnings src/register.js",
+    "deploy": "node --no-warnings src/register.js",
+    "test": "node --no-warnings --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}
